@@ -20,25 +20,9 @@ const GlobalErrorHandler = (
   let message = error.message || "Something went wrong!";
   let errorMessages: IGenericErrorMessage[] = [];
 
-  // handle prisma client validation errors
-  if (error instanceof Prisma.PrismaClientValidationError) {
-    const simplifiedError = handleValidationError(error);
-    statusCode = simplifiedError.statusCode;
-    message = simplifiedError.message;
-    errorMessages = simplifiedError.errorMessages;
-  }
-
   // Handle Zod Validation Errors
-  else if (error instanceof ZodError) {
+  if (error instanceof ZodError) {
     const simplifiedError = handleZodError(error);
-    statusCode = simplifiedError.statusCode;
-    message = simplifiedError.message;
-    errorMessages = simplifiedError.errorMessages;
-  }
-
-  // Handle Prisma Client Known Request Errors
-  else if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    const simplifiedError = handleClientError(error);
     statusCode = simplifiedError.statusCode;
     message = simplifiedError.message;
     errorMessages = simplifiedError.errorMessages;
@@ -69,44 +53,6 @@ const GlobalErrorHandler = (
           },
         ]
       : [];
-  }
-
-  // Prisma Client Initialization Error
-  else if (error instanceof Prisma.PrismaClientInitializationError) {
-    statusCode = httpStatus.INTERNAL_SERVER_ERROR;
-    message =
-      "Failed to initialize Prisma Client. Check your database connection or Prisma configuration.";
-    errorMessages = [
-      {
-        path: "",
-        message: "Failed to initialize Prisma Client.",
-      },
-    ];
-  }
-
-  // Prisma Client Rust Panic Error
-  else if (error instanceof Prisma.PrismaClientRustPanicError) {
-    statusCode = httpStatus.INTERNAL_SERVER_ERROR;
-    message =
-      "A critical error occurred in the Prisma engine. Please try again later.";
-    errorMessages = [
-      {
-        path: "",
-        message: "Prisma Client Rust Panic Error",
-      },
-    ];
-  }
-
-  // Prisma Client Unknown Request Error
-  else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-    statusCode = httpStatus.INTERNAL_SERVER_ERROR;
-    message = "An unknown error occurred while processing the request.";
-    errorMessages = [
-      {
-        path: "",
-        message: "Prisma Client Unknown Request Error",
-      },
-    ];
   }
 
   // Generic Error Handling (e.g., JavaScript Errors)
