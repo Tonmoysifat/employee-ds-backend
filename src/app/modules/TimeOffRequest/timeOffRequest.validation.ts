@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 const TimeOffCreateSchema = z.object({
-  employee: z.string(),
   startDate: z.string().or(z.date()),
   endDate: z.string().or(z.date()),
   reason: z.string().optional(),
@@ -15,3 +14,6 @@ export const timeOffValidation = {
   TimeOffCreateSchema,
   ApproveRejectSchema,
 };
+
+export type ITimeOff = z.infer<typeof TimeOffCreateSchema>;
+export type IArtor = z.infer<typeof ApproveRejectSchema>;

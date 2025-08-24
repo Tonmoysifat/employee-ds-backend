@@ -10,9 +10,14 @@ const CreateShiftSchema = z.object({
   assignedEmployee: z.string().optional().nullable(),
 });
 
-const AssignShiftSchema = z.object({ employeeId: z.string() });
+const updateShift = CreateShiftSchema.partial();
+
+const AssignShiftSchema = z.object({ employeeId: z.string().min(24) });
 
 export const shiftValidation = {
   CreateShiftSchema,
   AssignShiftSchema,
+  updateShift,
 };
+
+export type IShift = z.infer<typeof CreateShiftSchema>;
