@@ -30,4 +30,4 @@ router.get(
   timeOfController.getTimeOff
 );
 
-export const authRoutes = router;
+export const timeRequestRoutes = router;

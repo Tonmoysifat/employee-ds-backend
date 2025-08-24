@@ -34,4 +34,4 @@ router.delete(
   shiftController.deleteShift
 );
 
-export const authRoutes = router;
+export const shiftRoutes = router;
