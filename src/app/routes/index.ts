@@ -28,7 +28,7 @@ const moduleRoutes = [
     route: shiftRoutes,
   },
   {
-    path: "/timeRequest",
+    path: "/timeOffRequest",
     route: timeRequestRoutes,
   },
   {
