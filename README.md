@@ -47,12 +47,15 @@ iv) PORT =
 
 Populate MongoDB with sample employees, shifts, and time-off requests:
 
-  npm run seed
+  i) npm run seed
 
 4. Start server
-npm run dev    # development with hot reload
-npm run build  # compile TypeScript
-npm start      # run compiled code
+
+   i) npm run dev    # development with hot 
+
+   ii) npm run build  # compile TypeScript
+
+   iii) npm start      # run compiled code
 
 
 Server will be running at:
@@ -69,35 +72,53 @@ POST baseUrl/api/v1/auth/login → Login (get JWT)
 Employees
 
 POST  baseUrl/api/v1/employee/create-employee → Create employee
+
 PUT    baseUrl/api/v1/employee/update-employee/:employeeId   → Update employee
+
 GET    baseUrl/api/v1/employee/get-employees-list            → Get list of employees
-GET    baseUrl/api/v1/employee/get-single-employee/:employeeId → Get single employee
+
+GET    baseUrl/api/v1/employee/get-single-employee/:employeeId → Get single 
+
 DELETE baseUrl/api/v1/employee/delete-employee/:employeeId → Delete employee
 
 Shifts
 
 POST    baseUrl/api/v1/shift/create-shift      → Create shift
+
 PUT     baseUrl/api/v1/shift/update-shift      → Update shift
+
 POST    baseUrl/api/v1/shift/assign-shift/:id → Assign shift
+
 GET     baseUrl/api/v1/shift/list-shift        → List all shifts
+
 GET     baseUrl/api/v1/shift/get-shift/:id     → Get single shift
+
 DELETE  baseUrl/api/v1/shift/delete-shift/:id → Delete shift
 
 Time-off
 
 POST    baseUrl/api/v1/timeOffRequest/create-time-off-request           → Create time off request
+
 PUT     baseUrl/api/v1/timeOffRequest/approve-or-reject-time-off-request/:id → Approve or reject time off request
+
 GET     baseUrl/api/v1/timeOffRequest/get-list-of-time-off-requests      → Get list of time off requests
+
 GET     baseUrl/api/v1/timeOffRequest/get-of-time-off-request-by-id/:id  → Get single time off request by ID
 
 
+
 Schedule
+
 GET     baseUrl/api/v1/schedule/get-daily-schedule
 
 Analytics
+
 GET     baseUrl/api/v1/analytic/get-coverage               → Get coverage
-GET     baseUrl/api/v1/analytic/get-workload               → Get workload
+
+GET     baseUrl/api/v1/analytic/get-workload               → Get 
+
 GET     baseUrl/api/v1/analytic/get-conflicts-coverage     → Get conflicts and hourly coverage
+
 
 
 📊 Data Model
