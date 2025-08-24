@@ -123,6 +123,7 @@ GET     baseUrl/api/v1/analytic/get-conflicts-coverage     → Get conflicts and
 
 📊 Data Model
 Employee
+
 {
   name: string
   email: string (unique)
@@ -135,6 +136,7 @@ Employee
 }
 
 Shift
+
 {
   date: Date
   start: "HH:mm"
@@ -146,6 +148,7 @@ Shift
 }
 
 TimeOffRequest
+
 {
   employee: ObjectId
   startDate: Date
