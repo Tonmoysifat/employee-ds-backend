@@ -1,203 +1,203 @@
-import {Queue, Worker} from "bullmq";
-import Redis, {RedisOptions} from "ioredis";
-import {RedisMessage} from "../interfaces/common";
-import prisma from "../shared/prisma";
-// import { sendMessage } from "./sendMessage";
-// import { otpEmail } from "../emails/otpEmail";
-// import emailSender from "./emailSender/emailSender";
-// import { OtpDeliveryType } from "@prisma/client";
+// import {Queue, Worker} from "bullmq";
+// import Redis, {RedisOptions} from "ioredis";
+// import {RedisMessage} from "../interfaces/common";
+// import prisma from "../shared/prisma";
+// // import { sendMessage } from "./sendMessage";
+// // import { otpEmail } from "../emails/otpEmail";
+// // import emailSender from "./emailSender/emailSender";
+// // import { OtpDeliveryType } from "@prisma/client";
 
-const redisOptions: RedisOptions = {
-    host: process.env.REDIS_HOST || "127.0.0.1",
-    port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : 6379,
-    retryStrategy: (times: number) => {
-        if (times > 5) return undefined;
-        return Math.min(times * 100, 3000);
-    },
-    connectTimeout: 10000,
-    keepAlive: 30000,
-    maxRetriesPerRequest: null,
-};
+// const redisOptions: RedisOptions = {
+//     host: process.env.REDIS_HOST || "127.0.0.1",
+//     port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : 6379,
+//     retryStrategy: (times: number) => {
+//         if (times > 5) return undefined;
+//         return Math.min(times * 100, 3000);
+//     },
+//     connectTimeout: 10000,
+//     keepAlive: 30000,
+//     maxRetriesPerRequest: null,
+// };
 
-const redis = new Redis(redisOptions);
+// const redis = new Redis(redisOptions);
 
-redis.on("connect", () => console.log("✅ Redis connected successfully"));
-redis.on("error", (err: any) => console.error("❌ Redis error:", err));
+// redis.on("connect", () => console.log("✅ Redis connected successfully"));
+// redis.on("error", (err: any) => console.error("❌ Redis error:", err));
 
-const otpQueue = new Queue("otp-queue", {connection: redis});
+// const otpQueue = new Queue("otp-queue", {connection: redis});
 
-const upcomingEventsQueue = new Queue("upcoming-events-queue", {
-    connection: redis,
-});
-
-const messagePersistenceQueue = new Queue("messagePersistenceQueue", {
-    connection: redis,
-});
-
-// const otpWorker = new Worker(
-//   "otp-queue",
-//   async (job) => {
-//     const { type, otpCode, username, identifier } = job.data;
-//     const message = `Hi ${
-//       username || "User"
-//     }! Your Tophf0 App verification code is ${otpCode}. It’s valid for 10 minutes. Keep it safe and private!`;
-//     switch (type) {
-//       case OtpDeliveryType.EMAIL: {
-//         console.log("Jk");
-//         const html = await otpEmail(otpCode);
-//         await emailSender("OTP Verification", identifier, html);
-//         break;
-//       }
-//       case OtpDeliveryType.PHONE: {
-//         await sendMessage(identifier, message);
-//         break;
-//       }
-//
-//       default:
-//         break;
-//     }
-//     return "OTP job completed";
-//   },
-//   { connection: redis }
-// );
-
-const messagePersistenceWorker = new Worker(
-    "messagePersistenceQueue",
-    async (job) => {
-        const {conversationId} = job.data;
-        const redisKey = `chat:messages:${conversationId}`;
-        const backupKey = `chat:messages:backup:${conversationId}`;
-        let rawMessages: string[] = [];
-        let rawMessagesWithScores: (string | number)[] = [];
-
-        const backupExists = await redis.exists(backupKey);
-        if (backupExists) {
-            rawMessagesWithScores = await redis.zrevrange(
-                backupKey,
-                0,
-                -1,
-                "WITHSCORES"
-            );
-        } else {
-            rawMessagesWithScores = await redis.zrevrange(
-                redisKey,
-                0,
-                -1,
-                "WITHSCORES"
-            );
-            if (rawMessagesWithScores.length > 0) {
-                const args: (string | number)[] = [];
-                for (let i = 0; i < rawMessagesWithScores.length; i += 2) {
-                    const member = rawMessagesWithScores[i];
-                    const score = rawMessagesWithScores[i + 1];
-                    args.push(score, member);
-                }
-                await redis.zadd(backupKey, ...args);
-            }
-        }
-
-        if (!rawMessagesWithScores?.length) {
-            return `No messages to persist for ${conversationId}`;
-        }
-
-        rawMessages = [];
-        for (let i = 0; i < rawMessagesWithScores.length; i += 2) {
-            rawMessages.push(rawMessagesWithScores[i] as string);
-        }
-        const parsed: RedisMessage[] = rawMessages.map((msg) => JSON.parse(msg));
-
-        try {
-            await prisma.$transaction(
-                parsed.map((m) =>
-                    prisma.privateMessage.upsert({
-                        where: {id: m.id},
-                        update: {},
-                        create: {
-                            id: m.id!,
-                            senderId: m.senderId,
-                            receiverId: m.receiverId,
-                            content: m.content,
-                            imageUrl: m.imageUrl || null,
-                            createdAt: new Date(m.createdAt),
-                            updatedAt: new Date(m.createdAt),
-                            read: m.read || false,
-                            conversationId: m.conversationId,
-                        },
-                    })
-                )
-            );
-
-            await Promise.all([redis.del(redisKey), redis.del(backupKey)]);
-            return `✅ Persisted ${parsed.length} messages for ${conversationId}`;
-        } catch (error: any) {
-            return `❌ DB error: ${error.message || error}`;
-        }
-    },
-    {connection: redis}
-);
-
-const cleanQueues = async () => {
-    await Promise.all([
-        otpQueue.clean(0, 1000, "completed"),
-        otpQueue.clean(0, 1000, "failed"),
-        otpQueue.clean(0, 1000, "delayed"),
-        otpQueue.clean(0, 1000, "wait"),
-
-        messagePersistenceQueue.clean(0, 1000, "completed"),
-        messagePersistenceQueue.clean(0, 1000, "failed"),
-        messagePersistenceQueue.clean(0, 1000, "delayed"),
-        messagePersistenceQueue.clean(0, 1000, "wait"),
-    ]);
-};
-
-// Run cleanup at startup
-(async () => {
-    try {
-        await cleanQueues();
-        console.log("🧹 [Queue] All queues cleaned successfully.");
-    } catch (err) {
-        console.error("❌ Failed to clean queues:", err);
-    }
-})();
-
-// Helper function to handle failed jobs cleanup
-const handleJobFailure = async (job: any, err: any) => {
-    try {
-        await job.remove();
-    } catch (removeErr) {
-        console.error(`Failed to remove job ${job.id}:`, removeErr);
-    }
-};
-
-// otpWorker.on("completed", (job) => {
-//   console.log(`✅ OTP job completed: ${job.id}`);
+// const upcomingEventsQueue = new Queue("upcoming-events-queue", {
+//     connection: redis,
 // });
 
-messagePersistenceWorker.on("completed", (job) => {
-    console.log(`✅ Message job completed: ${job.id}`);
-});
+// const messagePersistenceQueue = new Queue("messagePersistenceQueue", {
+//     connection: redis,
+// });
 
-// otpWorker.on("failed", handleJobFailure);
+// // const otpWorker = new Worker(
+// //   "otp-queue",
+// //   async (job) => {
+// //     const { type, otpCode, username, identifier } = job.data;
+// //     const message = `Hi ${
+// //       username || "User"
+// //     }! Your Tophf0 App verification code is ${otpCode}. It’s valid for 10 minutes. Keep it safe and private!`;
+// //     switch (type) {
+// //       case OtpDeliveryType.EMAIL: {
+// //         console.log("Jk");
+// //         const html = await otpEmail(otpCode);
+// //         await emailSender("OTP Verification", identifier, html);
+// //         break;
+// //       }
+// //       case OtpDeliveryType.PHONE: {
+// //         await sendMessage(identifier, message);
+// //         break;
+// //       }
+// //
+// //       default:
+// //         break;
+// //     }
+// //     return "OTP job completed";
+// //   },
+// //   { connection: redis }
+// // );
 
-messagePersistenceWorker.on("failed", handleJobFailure);
+// const messagePersistenceWorker = new Worker(
+//     "messagePersistenceQueue",
+//     async (job) => {
+//         const {conversationId} = job.data;
+//         const redisKey = `chat:messages:${conversationId}`;
+//         const backupKey = `chat:messages:backup:${conversationId}`;
+//         let rawMessages: string[] = [];
+//         let rawMessagesWithScores: (string | number)[] = [];
 
-// Graceful shutdown
-process.on("SIGINT", async () => {
-    console.log("🚨 Gracefully shutting down...");
-    await otpQueue.close();
-    // await otpWorker.close();
-    await messagePersistenceWorker.close();
-    await messagePersistenceQueue.close();
-    await upcomingEventsQueue.close();
-    await redis.quit();
-    console.log("✅ Workers and Queues closed gracefully");
-    process.exit(0);
-});
+//         const backupExists = await redis.exists(backupKey);
+//         if (backupExists) {
+//             rawMessagesWithScores = await redis.zrevrange(
+//                 backupKey,
+//                 0,
+//                 -1,
+//                 "WITHSCORES"
+//             );
+//         } else {
+//             rawMessagesWithScores = await redis.zrevrange(
+//                 redisKey,
+//                 0,
+//                 -1,
+//                 "WITHSCORES"
+//             );
+//             if (rawMessagesWithScores.length > 0) {
+//                 const args: (string | number)[] = [];
+//                 for (let i = 0; i < rawMessagesWithScores.length; i += 2) {
+//                     const member = rawMessagesWithScores[i];
+//                     const score = rawMessagesWithScores[i + 1];
+//                     args.push(score, member);
+//                 }
+//                 await redis.zadd(backupKey, ...args);
+//             }
+//         }
 
-export {
-    messagePersistenceQueue,
-    otpQueue,
-    // otpWorker,
-    redis,
-    upcomingEventsQueue,
-};
+//         if (!rawMessagesWithScores?.length) {
+//             return `No messages to persist for ${conversationId}`;
+//         }
+
+//         rawMessages = [];
+//         for (let i = 0; i < rawMessagesWithScores.length; i += 2) {
+//             rawMessages.push(rawMessagesWithScores[i] as string);
+//         }
+//         const parsed: RedisMessage[] = rawMessages.map((msg) => JSON.parse(msg));
+
+//         try {
+//             await prisma.$transaction(
+//                 parsed.map((m) =>
+//                     prisma.privateMessage.upsert({
+//                         where: {id: m.id},
+//                         update: {},
+//                         create: {
+//                             id: m.id!,
+//                             senderId: m.senderId,
+//                             receiverId: m.receiverId,
+//                             content: m.content,
+//                             imageUrl: m.imageUrl || null,
+//                             createdAt: new Date(m.createdAt),
+//                             updatedAt: new Date(m.createdAt),
+//                             read: m.read || false,
+//                             conversationId: m.conversationId,
+//                         },
+//                     })
+//                 )
+//             );
+
+//             await Promise.all([redis.del(redisKey), redis.del(backupKey)]);
+//             return `✅ Persisted ${parsed.length} messages for ${conversationId}`;
+//         } catch (error: any) {
+//             return `❌ DB error: ${error.message || error}`;
+//         }
+//     },
+//     {connection: redis}
+// );
+
+// const cleanQueues = async () => {
+//     await Promise.all([
+//         otpQueue.clean(0, 1000, "completed"),
+//         otpQueue.clean(0, 1000, "failed"),
+//         otpQueue.clean(0, 1000, "delayed"),
+//         otpQueue.clean(0, 1000, "wait"),
+
+//         messagePersistenceQueue.clean(0, 1000, "completed"),
+//         messagePersistenceQueue.clean(0, 1000, "failed"),
+//         messagePersistenceQueue.clean(0, 1000, "delayed"),
+//         messagePersistenceQueue.clean(0, 1000, "wait"),
+//     ]);
+// };
+
+// // Run cleanup at startup
+// (async () => {
+//     try {
+//         await cleanQueues();
+//         console.log("🧹 [Queue] All queues cleaned successfully.");
+//     } catch (err) {
+//         console.error("❌ Failed to clean queues:", err);
+//     }
+// })();
+
+// // Helper function to handle failed jobs cleanup
+// const handleJobFailure = async (job: any, err: any) => {
+//     try {
+//         await job.remove();
+//     } catch (removeErr) {
+//         console.error(`Failed to remove job ${job.id}:`, removeErr);
+//     }
+// };
+
+// // otpWorker.on("completed", (job) => {
+// //   console.log(`✅ OTP job completed: ${job.id}`);
+// // });
+
+// messagePersistenceWorker.on("completed", (job) => {
+//     console.log(`✅ Message job completed: ${job.id}`);
+// });
+
+// // otpWorker.on("failed", handleJobFailure);
+
+// messagePersistenceWorker.on("failed", handleJobFailure);
+
+// // Graceful shutdown
+// process.on("SIGINT", async () => {
+//     console.log("🚨 Gracefully shutting down...");
+//     await otpQueue.close();
+//     // await otpWorker.close();
+//     await messagePersistenceWorker.close();
+//     await messagePersistenceQueue.close();
+//     await upcomingEventsQueue.close();
+//     await redis.quit();
+//     console.log("✅ Workers and Queues closed gracefully");
+//     process.exit(0);
+// });
+
+// export {
+//     messagePersistenceQueue,
+//     otpQueue,
+//     // otpWorker,
+//     redis,
+//     upcomingEventsQueue,
+// };

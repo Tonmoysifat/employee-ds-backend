@@ -3,7 +3,7 @@ import config from "../config";
 import { number } from "zod";
 
 export const hashPassword = async (password: string): Promise<string> => {
-  const saltRounds = Number(config.password.password_salt);
+  const saltRounds = Number(12);
   return await bcrypt.hash(password, saltRounds);
 };
 

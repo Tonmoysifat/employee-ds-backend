@@ -3,7 +3,7 @@ import { Secret } from "jsonwebtoken";
 import config from "../../../config";
 import ApiError from "../../../errors/ApiErrors";
 import { jwtHelpers } from "../../../helpers/jwtHelpers";
-import emailSender from "../../../helpers/emailSender/emailSender";
+// import emailSender from "../../../helpers/emailSender/emailSender";
 import {
   comparePassword,
   hashPassword,
