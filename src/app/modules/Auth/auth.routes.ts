@@ -1,6 +1,4 @@
-import {UserRole} from "@prisma/client";
 import express from "express";
-import auth from "../../middlewares/auth";
 import validateRequest from "../../middlewares/validateRequest";
 import {authController} from "./auth.controller";
 import {authValidation} from "./auth.validation";
